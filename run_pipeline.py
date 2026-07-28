@@ -453,7 +453,8 @@ def main() -> None:
                     category=", ".join(safety_res["categories_detected"]) or "safety_policy_violation",
                     reason=safety_res["reason"]
                 )
-                log_stage_error("YouTube Upload", f"Upload aborted due to safety policy violation: {safety_res['reason']}")
+                log_stage_error("YouTube Upload", f"Upload aborted due to safety policy violation: {safety_res['reason']}", fatal=True)
+                sys.exit(1)
             else:
                 video_id = upload_short(
                     video_path=video_path,
@@ -467,7 +468,8 @@ def main() -> None:
                 if video_id:
                     log_stage_finish("YouTube Upload", {"video_id": video_id})
                 else:
-                    log_stage_error("YouTube Upload", "Upload failed")
+                    log_stage_error("YouTube Upload", "Upload failed", fatal=True)
+                    sys.exit(1)
         else:
             log_stage_start("YouTube Upload")
             log_stage_finish("YouTube Upload", {"status": "skipped"})
