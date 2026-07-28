@@ -52,16 +52,48 @@ def main() -> None:
     flow = InstalledAppFlow.from_client_config(client_config, SCOPES)
     creds = flow.run_local_server(port=0, open_browser=True)
 
+    new_token = creds.refresh_token
+
     print()
     print("=" * 60)
     print("✅ SUCCESS! Here is your new refresh token:")
     print()
-    print(f"   {creds.refresh_token}")
+    print(f"   {new_token}")
     print()
     print("=" * 60)
     print()
-    print("📌 Add this to your .env file:")
-    print(f'   YT_MEME_REFRESH_TOKEN="{creds.refresh_token}"')
+
+    # Automatically update local .env file
+    env_path = config.ROOT / ".env"
+    if env_path.exists():
+        try:
+            content = env_path.read_text(encoding="utf-8")
+            lines = content.splitlines()
+            new_lines = []
+            updated_ref = False
+            updated_meme_ref = False
+            for line in lines:
+                if line.startswith("YT_REFRESH_TOKEN="):
+                    new_lines.append(f'YT_REFRESH_TOKEN="{new_token}"')
+                    updated_ref = True
+                elif line.startswith("YT_MEME_REFRESH_TOKEN="):
+                    new_lines.append(f'YT_MEME_REFRESH_TOKEN="{new_token}"')
+                    updated_meme_ref = True
+                else:
+                    new_lines.append(line)
+            if not updated_ref:
+                new_lines.append(f'YT_REFRESH_TOKEN="{new_token}"')
+            if not updated_meme_ref:
+                new_lines.append(f'YT_MEME_REFRESH_TOKEN="{new_token}"')
+            env_path.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
+            print("✔ Automatically updated local .env file with new refresh token!")
+        except Exception as e:
+            print(f"⚠️ Could not auto-update .env file: {e}")
+
+    print()
+    print("📌 IMPORTANT: Update GitHub Secrets (Settings -> Secrets -> Actions):")
+    print(f'   YT_REFRESH_TOKEN = {new_token}')
+    print(f'   YT_MEME_REFRESH_TOKEN = {new_token}')
     print()
 
 
