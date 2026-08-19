@@ -45,24 +45,38 @@ class GroqProvider(BaseLLMProvider):
             
         user_prompt = get_user_prompt(post.subreddit, post.title, post.selftext)
 
-        logger.info(f"Sending request to Groq model: {config.LLM_MODEL}")
-        try:
-            completion = self.client.chat.completions.create(
-                model=config.LLM_MODEL,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt},
-                ],
-                temperature=0.8,
-                max_tokens=600,
-                timeout=30,
-            )
-            response = completion.choices[0].message.content
-            if not response:
-                raise ValueError("Received empty response from Groq")
-                
-            return parse_structured_response(response, default_title=post.title)
+        models_to_try = [config.LLM_MODEL]
+        if config.LLM_MODEL not in ["llama-3.3-70b-versatile", "llama3-8b-8192", "gemma2-9b-it"]:
+            models_to_try.extend(["llama-3.3-70b-versatile", "llama3-8b-8192", "gemma2-9b-it"])
 
-        except Exception as e:
-            logger.error(f"Groq API error: {e}")
-            raise e
+        last_err = None
+        for m in models_to_try:
+            logger.info(f"Sending request to Groq model: {m}")
+            try:
+                completion = self.client.chat.completions.create(
+                    model=m,
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt},
+                    ],
+                    temperature=0.8,
+                    max_tokens=600,
+                    timeout=30,
+                )
+                response = completion.choices[0].message.content
+                if not response:
+                    raise ValueError("Received empty response from Groq")
+                    
+                return parse_structured_response(response, default_title=post.title)
+
+            except Exception as e:
+                last_err = e
+                err_s = str(e).lower()
+                if "404" in err_s or "model_not_found" in err_s or "does not exist" in err_s:
+                    logger.warning(f"Groq model {m} not found/deprecated. Trying fallback model...")
+                    continue
+                logger.error(f"Groq API error: {e}")
+                raise e
+
+        if last_err:
+            raise last_err

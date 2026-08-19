@@ -175,17 +175,34 @@ class ContentSafetyAnalyzer:
             else:
                 user_content = user_prompt
                 
-            completion = client.chat.completions.create(
-                model=actual_model,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_content},
-                ],
-                temperature=0.0,
-                max_tokens=300,
-                timeout=15,
-            )
-            return completion.choices[0].message.content or ""
+            models_to_try = [actual_model]
+            if actual_model not in ["llama-3.3-70b-versatile", "llama3-8b-8192", "gemma2-9b-it"]:
+                models_to_try.extend(["llama-3.3-70b-versatile", "llama3-8b-8192", "gemma2-9b-it"])
+            
+            last_err = None
+            for m in models_to_try:
+                try:
+                    completion = client.chat.completions.create(
+                        model=m,
+                        messages=[
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": user_content},
+                        ],
+                        temperature=0.0,
+                        max_tokens=300,
+                        timeout=15,
+                    )
+                    return completion.choices[0].message.content or ""
+                except Exception as e:
+                    last_err = e
+                    err_s = str(e).lower()
+                    if "404" in err_s or "model_not_found" in err_s or "does not exist" in err_s:
+                        logger.warning(f"Groq model {m} not found/deprecated. Trying fallback model...")
+                        continue
+                    raise e
+            if last_err:
+                raise last_err
+            return ""
             
         elif provider in ("openai", "deepseek", "openrouter", "ollama"):
             import openai

@@ -126,7 +126,7 @@ OLLAMA_API_URL = _env("OLLAMA_API_URL", "http://localhost:11434/v1")
 # Resolve default model names if none is provided
 if not LLM_MODEL:
     if LLM_PROVIDER == "groq":
-        LLM_MODEL = "llama-3.1-8b-instant"
+        LLM_MODEL = "llama-3.3-70b-versatile"
     elif LLM_PROVIDER == "deepseek":
         LLM_MODEL = "deepseek-chat"
     elif LLM_PROVIDER == "gemini":
@@ -138,7 +138,7 @@ if not LLM_MODEL:
     elif LLM_PROVIDER == "ollama":
         LLM_MODEL = "llama3"
     else:
-        LLM_MODEL = "llama-3.1-8b-instant"
+        LLM_MODEL = "llama-3.3-70b-versatile"
 
 # ── Voice / TTS Settings ─────────────────────────────────────
 TTS_PROVIDER = _env("TTS_PROVIDER", "edge")  # edge, elevenlabs, openai
