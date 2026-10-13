@@ -10,19 +10,64 @@ Uses the same YT_CLIENT_ID and YT_CLIENT_SECRET_VALUE from your .env.
 """
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 from dotenv import load_dotenv
 
-load_dotenv()
+ENV_PATH = Path(__file__).resolve().parent / ".env"
+load_dotenv(ENV_PATH, override=True)
 
 import config
 
+# Re-read in case imported before override
+YT_CLIENT_ID = os.environ.get("YT_CLIENT_ID") or config.YT_CLIENT_ID
+YT_CLIENT_SECRET = os.environ.get("YT_CLIENT_SECRET_VALUE") or config.YT_CLIENT_SECRET
+
 
 def main() -> None:
-    if not config.YT_CLIENT_ID or "your_client_id" in config.YT_CLIENT_ID:
-        print("❌ Set YT_CLIENT_ID and YT_CLIENT_SECRET_VALUE in .env first!")
+    global YT_CLIENT_ID, YT_CLIENT_SECRET
+    
+    if not YT_CLIENT_ID or "your_client_id" in YT_CLIENT_ID:
+        print("=" * 60)
+        print("🔑 YOUTUBE CLIENT ID & SECRET SETUP")
+        print("=" * 60)
+        print("Please paste your Client ID from Google Cloud Console:")
+        try:
+            YT_CLIENT_ID = input("YT_CLIENT_ID: ").strip().strip('"').strip("'")
+        except (KeyboardInterrupt, EOFError):
+            sys.exit(1)
+
+    if not YT_CLIENT_SECRET:
+        print("Please paste your Client Secret from Google Cloud Console:")
+        try:
+            YT_CLIENT_SECRET = input("YT_CLIENT_SECRET_VALUE: ").strip().strip('"').strip("'")
+        except (KeyboardInterrupt, EOFError):
+            sys.exit(1)
+
+    if not YT_CLIENT_ID or not YT_CLIENT_SECRET:
+        print("❌ Client ID and Client Secret are required!")
         sys.exit(1)
+
+    # Automatically save them into .env so the user never has to do it manually
+    if ENV_PATH.exists():
+        try:
+            import re
+            content = ENV_PATH.read_text(encoding="utf-8")
+            if "YT_CLIENT_ID=" in content:
+                content = re.sub(r'YT_CLIENT_ID=.*', f'YT_CLIENT_ID={YT_CLIENT_ID}', content)
+            else:
+                content += f"\nYT_CLIENT_ID={YT_CLIENT_ID}"
+                
+            if "YT_CLIENT_SECRET_VALUE=" in content:
+                content = re.sub(r'YT_CLIENT_SECRET_VALUE=.*', f'YT_CLIENT_SECRET_VALUE={YT_CLIENT_SECRET}', content)
+            else:
+                content += f"\nYT_CLIENT_SECRET_VALUE={YT_CLIENT_SECRET}"
+                
+            ENV_PATH.write_text(content, encoding="utf-8")
+            print(f"✔ Saved YT_CLIENT_ID and YT_CLIENT_SECRET_VALUE into {ENV_PATH.name}")
+        except Exception as e:
+            print(f"⚠️ Could not auto-save to .env: {e}")
 
     from google_auth_oauthlib.flow import InstalledAppFlow
     from google.oauth2.credentials import Credentials
@@ -31,8 +76,8 @@ def main() -> None:
 
     client_config = {
         "installed": {
-            "client_id": config.YT_CLIENT_ID,
-            "client_secret": config.YT_CLIENT_SECRET,
+            "client_id": YT_CLIENT_ID,
+            "client_secret": YT_CLIENT_SECRET,
             "auth_uri": "https://accounts.google.com/o/oauth2/auth",
             "token_uri": "https://oauth2.googleapis.com/token",
             "redirect_uris": ["http://localhost"],
