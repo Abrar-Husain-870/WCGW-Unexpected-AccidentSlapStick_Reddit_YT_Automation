@@ -8,17 +8,17 @@ from src.reddit.models import RedditPost
 # Default Lists of Tags and Hashtags
 EVERGREEN_TAGS = [
     "shorts", "youtubeshorts", "viral", "trending", "whatcouldgowrong",
-    "wcgw", "unexpected", "instantkarma", "instantregret", "fail",
+    "wcgw", "unexpected", "accidentalslapstick", "slapstick", "instantkarma", "instantregret", "fail",
     "fails", "funny videos", "reddit", "fyp", "comedy", "humor"
 ]
 
 DEFAULT_TRENDING_TAGS = [
-    "whatcouldgowrong", "wcgw", "unexpected", "instantkarma", "instantregret",
+    "whatcouldgowrong", "wcgw", "unexpected", "accidentalslapstick", "slapstick", "instantkarma", "instantregret",
     "fail", "fails", "viral", "fyp", "shorts", "comedy"
 ]
 
 EVERGREEN_HASHTAGS = [
-    "#Shorts", "#WhatCouldGoWrong", "#Unexpected", "#InstantKarma",
+    "#Shorts", "#WhatCouldGoWrong", "#Unexpected", "#AccidentalSlapStick", "#Slapstick", "#InstantKarma",
     "#InstantRegret", "#Fail", "#Fails", "#Funny", "#Reddit", "#Comedy", "#Viral"
 ]
 

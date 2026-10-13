@@ -52,7 +52,7 @@ SUBREDDITS = [
     s.strip()
     for s in _env(
         "SUBREDDITS",
-        "Whatcouldgowrong, Unexpected",
+        "Whatcouldgowrong, Unexpected, AccidentalSlapStick",
     ).split(",")
     if s.strip()
 ]
@@ -66,6 +66,7 @@ for s in SUBREDDITS:
 _preferred_weights = {
     "Whatcouldgowrong": 5.0,
     "Unexpected": 5.0,
+    "AccidentalSlapStick": 5.0,
     "memes": 3.0,
     "dankmemes": 3.0,
 }
