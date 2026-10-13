@@ -37,8 +37,9 @@ CLIPS_DIR = ROOT / DATA_DIR_NAME / "clips"             # Sliced background clips
 OUTPUT_DIR = ROOT / DATA_DIR_NAME / "output"           # Rendered assets/short
 CACHE_DIR = ROOT / DATA_DIR_NAME / "cache"             # Session tokens/archives
 DB_DIR = ROOT / DATA_DIR_NAME / "database"             # Processing history, database files
+ASSETS_DIR = ROOT / DATA_DIR_NAME / "assets"           # Fallback meme audios and visual assets
 
-for d in [RAW_DIR, CLIPS_DIR, OUTPUT_DIR, CACHE_DIR, DB_DIR]:
+for d in [RAW_DIR, CLIPS_DIR, OUTPUT_DIR, CACHE_DIR, DB_DIR, ASSETS_DIR]:
     d.mkdir(parents=True, exist_ok=True)
 
 # Database Files

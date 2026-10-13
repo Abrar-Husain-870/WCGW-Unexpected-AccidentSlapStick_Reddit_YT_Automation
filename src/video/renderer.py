@@ -4,7 +4,7 @@ import re
 import subprocess
 import sys
 from pathlib import Path
-from typing import List, Tuple, Dict
+from typing import List, Tuple, Dict, Optional
 
 import config
 from src.logger import logger
@@ -173,6 +173,24 @@ def _has_audio(path: Path) -> bool:
         return "audio" in r.stdout.lower()
     except Exception:
         return False
+
+
+def _get_fallback_meme_audio() -> Optional[Path]:
+    """Find the fallback 'Ocean meme audio' in data/assets or subdirectories."""
+    assets_dir = getattr(config, "ASSETS_DIR", config.ROOT / config.DATA_DIR_NAME / "assets")
+    search_dirs = [
+        assets_dir,
+        assets_dir / "cat_reactions",
+        config.ROOT / "data" / "assets",
+        config.ROOT / "data" / "assets" / "cat_reactions",
+    ]
+    for d in search_dirs:
+        if not d.exists():
+            continue
+        for f in d.iterdir():
+            if "ocean" in f.name.lower() and f.suffix.lower() in [".mpeg", ".mp3", ".wav", ".aac", ".ogg", ".m4a"]:
+                return f
+    return None
 
 
 def _get_image_dimensions(path: Path) -> Tuple[int, int]:
@@ -676,6 +694,7 @@ def render_curator_short(
     bottom_caption_path = None
     top_input_idx = None
     bottom_input_idx = None
+    current_idx = 1
 
     if title and getattr(config, "CAPTION_ON_TOP", True):
         from src.video.overlay import generate_creator_caption_banner, split_caption_for_landscape
@@ -731,7 +750,6 @@ def render_curator_short(
                 )
 
             # Assign sequential input indices for FFmpeg
-            current_idx = 1
             if top_caption_path and top_caption_path.exists():
                 top_input_idx = current_idx
                 inputs.extend(["-loop", "1", "-i", str(top_caption_path)])
@@ -865,9 +883,11 @@ def render_curator_short(
         )
         last_v_tag = "v_final"
         
-    # F. Audio Processing: Fade-in/out the original audio
+    # F. Audio Processing: Use original audio if present, or looping fallback audio if silent
     has_audio = _has_audio(meme_video_path)
     audio_map_args = []
+    fallback_input_idx = None
+
     if has_audio:
         if add_intro_outro:
             fade_dur = 0.5
@@ -879,7 +899,32 @@ def render_curator_short(
             audio_map_args = ["-map", "[a_faded]"]
         else:
             audio_map_args = ["-map", "0:a"]
-    
+    else:
+        # Meme video has no audio. Fall back to "Ocean meme audio" in assets
+        fallback_audio_path = _get_fallback_meme_audio()
+        if fallback_audio_path and fallback_audio_path.exists():
+            fallback_input_idx = current_idx
+            # Loop infinitely using -stream_loop -1 so if video is longer than audio, it repeats seamlessly
+            inputs.extend(["-stream_loop", "-1", "-i", str(fallback_audio_path)])
+            current_idx += 1
+            logger.info(
+                f"Meme video has no audio. Using looping fallback audio '{fallback_audio_path.name}' "
+                f"(input #{fallback_input_idx}) trimmed to {render_duration:.2f}s"
+            )
+            if add_intro_outro:
+                fade_dur = 0.5
+                out_start = render_duration - fade_dur
+                filter_chains.append(
+                    f"[{fallback_input_idx}:a]afade=type=in:start_time=0:duration={fade_dur},"
+                    f"afade=type=out:start_time={out_start:.2f}:duration={fade_dur}[a_faded]"
+                )
+                audio_map_args = ["-map", "[a_faded]"]
+            else:
+                # Map audio stream (using :a:0 to avoid any attached album artwork)
+                audio_map_args = ["-map", f"{fallback_input_idx}:a:0"]
+        else:
+            logger.warning("Meme video has no audio, and fallback 'Ocean meme audio' was not found.")
+
     # 4. Build and execute complete FFmpeg command
     filter_complex_str = ";".join(filter_chains)
     cmd = ["ffmpeg", "-y"]
@@ -888,7 +933,7 @@ def render_curator_short(
         "-filter_complex", filter_complex_str,
         "-map", f"[{last_v_tag}]"
     ])
-    if has_audio:
+    if has_audio or fallback_input_idx is not None:
         cmd.extend(audio_map_args)
         
     cmd.extend([
@@ -899,7 +944,7 @@ def render_curator_short(
         "-profile:v", "high",
         "-level", "4.2"
     ])
-    if has_audio:
+    if has_audio or fallback_input_idx is not None:
         cmd.extend([
             "-c:a", "aac",
             "-b:a", "256k",
