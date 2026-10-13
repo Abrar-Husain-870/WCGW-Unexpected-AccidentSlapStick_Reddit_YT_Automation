@@ -171,10 +171,8 @@ jobs:
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          # Stage only the database tracking files, not the generated video
-          git add data/database/processed_posts.json || true
-          git add data/database/upload_history.json  || true
-          git add data/database/used_backgrounds.json || true
+          # Stage all database tracking files, not the generated video
+          git add data/database/*.json || true
 
           # Only commit if there are actual changes
           if git diff --cached --quiet; then
