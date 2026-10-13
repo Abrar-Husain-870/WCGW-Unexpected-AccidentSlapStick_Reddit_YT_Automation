@@ -79,8 +79,9 @@ def run_test():
             meme_video_path=video_path,
             output_path=output_video,
             title=selected_post.title,
-            branding_text="@CuratorTestBot",
-            add_intro_outro=True
+            branding_text="",
+            add_intro_outro=False,
+            subreddit=selected_post.subreddit
         )
         if output_video.exists():
             size_mb = output_video.stat().st_size / (1024 * 1024)

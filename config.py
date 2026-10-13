@@ -31,7 +31,7 @@ def _env_bool(key: str, default: bool = False) -> bool:
 
 
 # ── Directories ──────────────────────────────────────────────
-DATA_DIR_NAME = _env("DATA_DIR_NAME", "data_video_bot")
+DATA_DIR_NAME = _env("DATA_DIR_NAME", "data")
 RAW_DIR = ROOT / DATA_DIR_NAME / "raw"                 # Raw background videos
 CLIPS_DIR = ROOT / DATA_DIR_NAME / "clips"             # Sliced background clips
 OUTPUT_DIR = ROOT / DATA_DIR_NAME / "output"           # Rendered assets/short
@@ -51,7 +51,7 @@ SUBREDDITS = [
     s.strip()
     for s in _env(
         "SUBREDDITS",
-        "memes, dankmemes, me_irl, funny, wholesomememes, AdviceAnimals, blursedimages, perfectlycutscreams, AnimalsBeingDerps, cats, dogs, meme, meirl, MemeVideos",
+        "Whatcouldgowrong, Unexpected",
     ).split(",")
     if s.strip()
 ]
@@ -63,18 +63,10 @@ for s in SUBREDDITS:
 
 # High priority subreddits get configured weights
 _preferred_weights = {
-    "memes": 5.0,
-    "dankmemes": 4.0,
-    "me_irl": 4.0,
-    "funny": 3.0,
-    "wholesomememes": 5.0,
-    "AdviceAnimals": 3.0,
-    "blursedimages": 2.0,
-    "perfectlycutscreams": 3.0,
-    "AnimalsBeingDerps": 4.0,
-    "cats": 4.0,
-    "dogs": 4.0,
-    "MemeVideos": 5.0,
+    "Whatcouldgowrong": 5.0,
+    "Unexpected": 5.0,
+    "memes": 3.0,
+    "dankmemes": 3.0,
 }
 for s, w in _preferred_weights.items():
     if s in SUBREDDIT_WEIGHTS:
@@ -130,7 +122,7 @@ if not LLM_MODEL:
     elif LLM_PROVIDER == "deepseek":
         LLM_MODEL = "deepseek-chat"
     elif LLM_PROVIDER == "gemini":
-        LLM_MODEL = "gemini-2.0-flash"
+        LLM_MODEL = "gemini-3.8-flash"
     elif LLM_PROVIDER == "openai":
         LLM_MODEL = "gpt-4o-mini"
     elif LLM_PROVIDER == "openrouter":
@@ -185,7 +177,7 @@ CAPTION_FONT = _env("CAPTION_FONT", "Impact")
 OVERLAY_REDDIT_SCREENSHOT = _env_bool("OVERLAY_REDDIT_SCREENSHOT", True)
 OVERLAY_PROFILE_ICON = _env_bool("OVERLAY_PROFILE_ICON", True)
 OVERLAY_SUBREDDIT_TAG = _env_bool("OVERLAY_SUBREDDIT_TAG", True)
-OVERLAY_PROGRESS_BAR = _env_bool("OVERLAY_PROGRESS_BAR", True)
+OVERLAY_PROGRESS_BAR = _env_bool("OVERLAY_PROGRESS_BAR", False)
 OVERLAY_BACKGROUND_BLUR = _env_bool("OVERLAY_BACKGROUND_BLUR", True)
 
 # ── YouTube Upload Settings ──────────────────────────────────
@@ -196,8 +188,8 @@ YT_PRIVACY = _env("YOUTUBE_PRIVACY", "public")
 
 # Engagement Metadata Customizations
 METADATA_MENTIONS = _env("METADATA_MENTIONS", "")
-METADATA_TRENDING_TAGS = _env("METADATA_TRENDING_TAGS", "viral, fyp, shortvideo, story, dailycontent, interesting, mustwatch")
-METADATA_DISCLAIMER = _env("METADATA_DISCLAIMER", "Narration is an AI-generated retelling and commentary of this story.")
+METADATA_TRENDING_TAGS = _env("METADATA_TRENDING_TAGS", "whatcouldgowrong, wcgw, unexpected, instantregret, instantkarma, fail, fails, viral, shorts")
+METADATA_DISCLAIMER = _env("METADATA_DISCLAIMER", "Curated funny fail & unexpected clips from Reddit.")
 
 # ── Scheduler & Limits ───────────────────────────────────────
 MAX_VIDEOS_PER_DAY = int(_env("MAX_VIDEOS_PER_DAY", "4"))
@@ -210,14 +202,15 @@ UPLOAD_SCHEDULE_TIMES = [
 
 # ── Content Safety Settings ──────────────────────────────────
 ENABLE_CONTENT_SAFETY = _env_bool("ENABLE_CONTENT_SAFETY", True)
-SAFETY_MODE = _env("SAFETY_MODE", "strict").lower().strip()  # strict, standard, lenient
+SAFETY_MODE = _env("SAFETY_MODE", "standard").lower().strip()  # strict, standard, lenient
 MAX_ALLOWED_RISK = _env("MAX_ALLOWED_RISK", "low").lower().strip()  # safe, low, medium, high
-REJECT_FEMALE_HUMANS = _env_bool("REJECT_FEMALE_HUMANS", True)
+REJECT_FEMALE_HUMANS = _env_bool("REJECT_FEMALE_HUMANS", False)
+ENABLE_MEME_SUITABILITY = _env_bool("ENABLE_MEME_SUITABILITY", False)
 
 CAT_REACTION_FOLDER = ROOT / _env("CAT_REACTION_FOLDER", f"{DATA_DIR_NAME}/assets/cat_reactions")
 CAT_LAYOUT_HEIGHT = float(_env("CAT_LAYOUT_HEIGHT", "0.25"))
 MEME_LAYOUT_HEIGHT = float(_env("MEME_LAYOUT_HEIGHT", "0.75"))
-ENABLE_CAT_REACTIONS = _env_bool("ENABLE_CAT_REACTIONS", True)
+ENABLE_CAT_REACTIONS = _env_bool("ENABLE_CAT_REACTIONS", False)
 CAT_SELECTION_MODE = _env("CAT_SELECTION_MODE", "random")
 CAT_AVOID_REPEAT = _env_bool("CAT_AVOID_REPEAT", True)
 CAT_HISTORY_FILE = CACHE_DIR / "cat_history.json"
@@ -231,7 +224,7 @@ GREENSCREEN_FILE = ROOT / _env(
 )
 
 # Whether to enable greenscreen segment extraction at all
-USE_GREENSCREEN = _env_bool("USE_GREENSCREEN", True)
+USE_GREENSCREEN = _env_bool("USE_GREENSCREEN", False)
 
 # Probability (0.0 – 1.0) of choosing the greenscreen compilation instead of
 # a normal clip when both are available
@@ -252,9 +245,11 @@ GREENSCREEN_MAX_HEIGHT = int(_env("GREENSCREEN_MAX_HEIGHT", "800"))
 
 # ── Curator Mode Settings ───────────────────────────────────────────
 CURATOR_MODE = _env_bool("CURATOR_MODE", True)
-MAX_MEME_DURATION = float(_env("MAX_MEME_DURATION", "30.0"))
+MAX_MEME_DURATION = float(_env("MAX_MEME_DURATION", "59.0"))
 MIN_MEME_DURATION = float(_env("MIN_MEME_DURATION", "3.0"))
 ONLY_REDDIT_HOSTED = _env_bool("ONLY_REDDIT_HOSTED", True)
-REJECT_WATERMARKS = _env_bool("REJECT_WATERMARKS", True)
-BRANDING_TEXT = _env("BRANDING_TEXT", "@RedditMemes")
-ADD_INTRO_OUTRO = _env_bool("ADD_INTRO_OUTRO", True)
+REJECT_WATERMARKS = _env_bool("REJECT_WATERMARKS", False)
+BRANDING_TEXT = _env("BRANDING_TEXT", "")
+ADD_INTRO_OUTRO = _env_bool("ADD_INTRO_OUTRO", False)
+CAPTION_ON_TOP = _env_bool("CAPTION_ON_TOP", True)
+BOTTOM_CALLOUT_ENABLED = _env_bool("BOTTOM_CALLOUT_ENABLED", True)

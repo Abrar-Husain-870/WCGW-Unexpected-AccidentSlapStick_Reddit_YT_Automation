@@ -178,3 +178,176 @@ def generate_reddit_card(post: RedditPost) -> Path:
     canvas.save(output_path, "PNG")
     logger.info(f"Reddit card overlay generated at {output_path} ({card_width}x{card_height})")
     return output_path
+
+
+def split_caption_for_landscape(title: str) -> tuple[str, str | None]:
+    """
+    Intelligently splits a title into (top_text, bottom_text) for landscape videos.
+    If the title is short, keeps it as a single punchy top title and returns (top_text, None).
+    """
+    clean = re.sub(r'\s+', ' ', title).strip()
+    words = clean.split()
+    
+    # If title is short (<= 7 words and <= 38 characters), keep together on top
+    if len(words) <= 7 and len(clean) <= 38:
+        return clean, None
+        
+    # Check for strong sentence/clause delimiters: ".", "?", "!", ";", " - ", " | "
+    for delim in [". ", "? ", "! ", " - ", " | ", "; "]:
+        if delim in clean:
+            parts = clean.split(delim, 1)
+            p1, p2 = parts[0].strip(), parts[1].strip()
+            if delim.strip() in [".", "?", "!"]:
+                p1 += delim.strip()
+            if len(p1) >= 8 and len(p2) >= 8:
+                return p1, p2
+                
+    # Check for secondary punctuation like commas
+    if ", " in clean:
+        parts = clean.split(", ", 1)
+        p1, p2 = parts[0].strip(), parts[1].strip()
+        if len(p1) >= 10 and len(p2) >= 10:
+            return p1, p2
+            
+    # Check for natural conjunction split points near middle
+    conjunctions = [" while ", " when ", " but ", " until ", " then ", " and ", " because "]
+    mid_idx = len(clean) // 2
+    best_conj = None
+    best_dist = 999
+    for conj in conjunctions:
+        idx = clean.lower().find(conj)
+        while idx != -1:
+            dist = abs(idx - mid_idx)
+            if dist < best_dist and idx > 10 and (len(clean) - idx) > 10:
+                best_dist = dist
+                best_conj = (idx, conj)
+            idx = clean.lower().find(conj, idx + len(conj))
+            
+    if best_conj and best_dist < len(clean) * 0.35:
+        idx, conj = best_conj
+        p1 = clean[:idx].strip()
+        p2 = clean[idx:].strip()
+        return p1, p2
+        
+    # Fallback: split evenly by words
+    mid_word = len(words) // 2
+    p1 = " ".join(words[:mid_word])
+    p2 = " ".join(words[mid_word:])
+    return p1, p2
+
+
+def generate_creator_caption_banner(
+    text: str,
+    max_width: int = 1000,
+    min_width: int = 840,
+    font_size: int = 0,
+    is_bottom: bool = False,
+    is_vertical: bool = False,
+    filename: str = "top_caption.png"
+) -> Path:
+    """
+    Generate an impactful, viral creator-style caption banner.
+    Dynamically scales font size and container width to eliminate dead blank space.
+    """
+    output_path = config.OUTPUT_DIR / filename
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    
+    clean_text = re.sub(r'\s+', ' ', text).strip()
+    if not clean_text:
+        return output_path
+
+    # Determine dynamic font size based on text length and placement
+    if font_size <= 0:
+        if is_vertical:
+            font_size = 42
+            min_width = 650
+        elif is_bottom:
+            font_size = 48 if len(clean_text) <= 35 else 42
+            min_width = 780
+        else:
+            # Top banner for horizontal/square:
+            if len(clean_text) <= 26:
+                font_size = 56  # Bold, punchy text for short titles
+                min_width = 820
+            elif len(clean_text) <= 48:
+                font_size = 48
+                min_width = 800
+            else:
+                font_size = 42
+                min_width = 760
+
+    # Load bold fonts
+    font = None
+    for font_path in [
+        "C:/Windows/Fonts/ariblk.ttf",      # Arial Black (extra bold)
+        "C:/Windows/Fonts/arialbd.ttf",     # Arial Bold
+        "C:/Windows/Fonts/segoeuib.ttf",    # Segoe UI Bold
+        "arialbd.ttf",
+        "DejaVuSans-Bold.ttf"
+    ]:
+        try:
+            font = ImageFont.truetype(font_path, font_size)
+            break
+        except Exception:
+            continue
+    if font is None:
+        font = ImageFont.load_default()
+
+    # Pre-render dummy image for text measurement
+    dummy = Image.new("RGBA", (max_width, 100))
+    d = ImageDraw.Draw(dummy)
+    
+    # Calculate wrapped lines
+    padding_x = 48
+    padding_y = 28
+    line_spacing = 14
+    max_text_w = max_width - (padding_x * 2)
+    lines = _wrap_text(clean_text, d, font, max_text_w)
+    if not lines:
+        lines = [clean_text]
+    full_text = "\n".join(lines)
+        
+    # Measure whole multiline text block accurately using Pillow's multiline_textbbox
+    mb = d.multiline_textbbox((0, 0), full_text, font=font, spacing=line_spacing, align="center")
+    text_w = int(mb[2] - mb[0])
+    text_h = int(mb[3] - mb[1])
+    
+    # Proportional banner width to balance and fill upper/lower zones
+    banner_w = min(max_width, max(min_width, text_w + (padding_x * 2)))
+    banner_h = text_h + (padding_y * 2)
+    
+    canvas = Image.new("RGBA", (banner_w, banner_h), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(canvas)
+    
+    # Clean, vibrant white card container with rounded corners and subtle crisp border
+    bg_color = (255, 255, 255, 255)
+    border_color = (212, 215, 222, 255)
+    draw.rounded_rectangle(
+        [(0, 0), (banner_w - 1, banner_h - 1)],
+        radius=24,
+        fill=bg_color,
+        outline=border_color,
+        width=2
+    )
+    
+    # Draw centered text lines with razor-sharp black text (offset by mb[0], mb[1] for exact centering)
+    text_x = int((banner_w - text_w) // 2 - mb[0])
+    text_y = int((banner_h - text_h) // 2 - mb[1])
+    text_color = (12, 12, 16, 255)  # Deep bold black
+    
+    draw.multiline_text(
+        (text_x, text_y),
+        full_text,
+        font=font,
+        fill=text_color,
+        align="center",
+        spacing=line_spacing
+    )
+        
+    canvas.save(output_path, "PNG")
+    logger.info(f"Caption banner '{filename}' generated at {output_path} ({banner_w}x{banner_h}, font_size={font_size})")
+    return output_path
+
+
+# Backward compatibility alias
+generate_top_caption_banner = generate_creator_caption_banner

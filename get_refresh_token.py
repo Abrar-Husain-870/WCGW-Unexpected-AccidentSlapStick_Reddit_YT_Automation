@@ -90,8 +90,17 @@ def main() -> None:
         except Exception as e:
             print(f"⚠️ Could not auto-update .env file: {e}")
 
+    # Invalidate old cached token so new account is immediately active
+    token_file = config.CACHE_DIR / "yt_token.json"
+    if token_file.exists():
+        try:
+            token_file.unlink()
+            print("✔ Cleared previous cached YouTube session token.")
+        except Exception as e:
+            print(f"⚠️ Could not delete old cached token: {e}")
+
     print()
-    print("📌 IMPORTANT: Update GitHub Secrets (Settings -> Secrets -> Actions):")
+    print("📌 IMPORTANT: If using GitHub Actions, update GitHub Secrets:")
     print(f'   YT_REFRESH_TOKEN = {new_token}')
     print(f'   YT_MEME_REFRESH_TOKEN = {new_token}')
     print()

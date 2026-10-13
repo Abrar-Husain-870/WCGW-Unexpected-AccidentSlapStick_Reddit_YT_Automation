@@ -203,22 +203,23 @@ def main() -> None:
                 )
                 continue  # Skip and fetch another Reddit post automatically
 
-            # Stage 1.2: Meme Suitability & Universal Appeal check
-            suitability_res = safety_analyzer.check_meme_suitability(
-                title=post.title,
-                image_path=meme_video_path
-            )
-            if not suitability_res["passed"]:
-                reason_str = suitability_res["ratings"].get("reason", "Failed appeal/suitability criteria")
-                logger.warning(f"Post {post.id} rejected for low appeal/suitability. Reason: {reason_str}")
-                log_rejected_post(
-                    post_id=post.id,
-                    subreddit=post.subreddit,
-                    risk_score="Low Appeal",
-                    category="meme_suitability_filter",
-                    reason=reason_str
+            # Stage 1.2: Meme Suitability & Universal Appeal check (optional)
+            if getattr(config, "ENABLE_MEME_SUITABILITY", False):
+                suitability_res = safety_analyzer.check_meme_suitability(
+                    title=post.title,
+                    image_path=meme_video_path
                 )
-                continue  # Skip and fetch another Reddit post automatically
+                if not suitability_res["passed"]:
+                    reason_str = suitability_res["ratings"].get("reason", "Failed appeal/suitability criteria")
+                    logger.warning(f"Post {post.id} rejected for low appeal/suitability. Reason: {reason_str}")
+                    log_rejected_post(
+                        post_id=post.id,
+                        subreddit=post.subreddit,
+                        risk_score="Low Appeal",
+                        category="meme_suitability_filter",
+                        reason=reason_str
+                    )
+                    continue  # Skip and fetch another Reddit post automatically
 
             # Stage 1.3: Female human presence check (if configured)
             if config.REJECT_FEMALE_HUMANS:
@@ -245,7 +246,7 @@ def main() -> None:
                         "yt_title": post.title,
                         "yt_hook": post.title,
                         "yt_summary": post.title,
-                        "yt_category": "Comedy",
+                        "yt_category": "Entertainment",
                         "yt_content_tags": []
                     }
                     narration = ""
@@ -346,7 +347,8 @@ def main() -> None:
                     output_path=video_path,
                     title=post.title,
                     branding_text=config.BRANDING_TEXT,
-                    add_intro_outro=config.ADD_INTRO_OUTRO
+                    add_intro_outro=config.ADD_INTRO_OUTRO,
+                    subreddit=post.subreddit
                 )
                 log_stage_finish("Video Rendering", {"output_video": str(video_path)})
             except Exception as e:

@@ -7,17 +7,19 @@ from src.reddit.models import RedditPost
 
 # Default Lists of Tags and Hashtags
 EVERGREEN_TAGS = [
-    "shorts", "youtubeshorts", "viral", "trending", "memes", 
-    "funny memes", "reddit memes", "funny videos", "daily memes", 
-    "dank memes", "fyp", "reaction memes", "comedy", "humor", "relatable"
+    "shorts", "youtubeshorts", "viral", "trending", "whatcouldgowrong",
+    "wcgw", "unexpected", "instantkarma", "instantregret", "fail",
+    "fails", "funny videos", "reddit", "fyp", "comedy", "humor"
 ]
 
 DEFAULT_TRENDING_TAGS = [
-    "viral", "fyp", "shortvideo", "funny", "memes", "comedy", "relatable", "lol", "humor"
+    "whatcouldgowrong", "wcgw", "unexpected", "instantkarma", "instantregret",
+    "fail", "fails", "viral", "fyp", "shorts", "comedy"
 ]
 
 EVERGREEN_HASHTAGS = [
-    "#Shorts", "#Memes", "#Funny", "#Comedy", "#Reddit", "#DankMemes", "#Relatable", "#Lol", "#Humor", "#CatMemes"
+    "#Shorts", "#WhatCouldGoWrong", "#Unexpected", "#InstantKarma",
+    "#InstantRegret", "#Fail", "#Fails", "#Funny", "#Reddit", "#Comedy", "#Viral"
 ]
 
 # Curiosity-driven title templates if LLM title is missing or invalid
@@ -84,9 +86,12 @@ def generate_optimized_metadata(
     if llm_title:
         title = clean_title(llm_title)
         
-    # If Curator Mode (video memes), the original post title is the best title.
+    # If Curator Mode (video memes/fails), the original post title is the best title.
     if config.CURATOR_MODE:
         title = clean_title(post.title)
+        # Use full Reddit title cleanly up to YouTube's 100 character limit
+        if len(title) > 95:
+            title = title[:92].rsplit(' ', 1)[0] + "..."
     else:
         # If LLM title is missing or doesn't meet size requirements (40-70 chars preferred)
         if not title or len(title) < 30 or len(title) > 85:
@@ -100,8 +105,8 @@ def generate_optimized_metadata(
             else:
                 title = template
 
-    # Enforce hard YouTube Title limit (100 chars max, cropped to 70 for Shorts optimal views)
-    title = title[:75]
+        # Enforce hard YouTube Title limit (100 chars max, cropped to 75 for Shorts optimal views)
+        title = title[:75]
     
     # ── 2. DESCRIPTION GENERATION ───────────────────────────────────────────
     # Description Hook (1-2 lines)

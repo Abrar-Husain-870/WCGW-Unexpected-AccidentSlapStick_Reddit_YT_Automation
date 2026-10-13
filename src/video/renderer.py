@@ -635,11 +635,13 @@ def render_curator_short(
     output_path: Path | None = None,
     title: str = "",
     branding_text: str = "",
-    add_intro_outro: bool = True
+    add_intro_outro: bool = True,
+    subreddit: str = ""
 ) -> Path:
     """
     Renders a curator-style 9:16 vertical Short from a horizontal/square/portrait Reddit meme video.
     No voiceover or reaction clips are layered. The original audio of the meme video is preserved.
+    Dynamically frames captions to use upper and lower screen space like a top viral creator.
     """
     if output_path is None:
         output_path = config.OUTPUT_DIR / "final_short.mp4"
@@ -665,51 +667,175 @@ def render_curator_short(
     logger.info(f"Rendering Curator Short: duration={render_duration:.2f}s | aspect_ratio={meme_ar:.2f}")
     
     # 2. Build inputs
-    is_image = meme_video_path.suffix.lower() in ('.png', '.jpg', '.jpeg', '.webp', '.bmp', '.tiff')
     if is_image:
         inputs = ["-loop", "1", "-i", str(meme_video_path)]
     else:
         inputs = ["-i", str(meme_video_path)]
+
+    top_caption_path = None
+    bottom_caption_path = None
+    top_input_idx = None
+    bottom_input_idx = None
+
+    if title and getattr(config, "CAPTION_ON_TOP", True):
+        from src.video.overlay import generate_creator_caption_banner, split_caption_for_landscape
+        try:
+            if meme_ar >= 1.2:
+                # ── Landscape video: ample space in both top and bottom zones ──
+                top_text, bottom_text = split_caption_for_landscape(title)
+                
+                # If title was short and stayed on top, add an engagement hook at the bottom to eliminate dead space
+                if not bottom_text and getattr(config, "BOTTOM_CALLOUT_ENABLED", True) and subreddit:
+                    sub_clean = subreddit.replace("r/", "").strip()
+                    bottom_text = f"r/{sub_clean} • Wait for it 👀"
+
+                top_caption_path = generate_creator_caption_banner(
+                    top_text,
+                    max_width=1000,
+                    min_width=860,
+                    is_bottom=False,
+                    is_vertical=False,
+                    filename="top_caption.png"
+                )
+
+                if bottom_text:
+                    bottom_caption_path = generate_creator_caption_banner(
+                        bottom_text,
+                        max_width=960,
+                        min_width=800,
+                        is_bottom=True,
+                        is_vertical=False,
+                        filename="bottom_caption.png"
+                    )
+
+            elif meme_ar >= 0.6:
+                # ── Square / 4:3 video: moderate space above video, clean below ──
+                top_caption_path = generate_creator_caption_banner(
+                    title,
+                    max_width=980,
+                    min_width=820,
+                    is_bottom=False,
+                    is_vertical=False,
+                    filename="top_caption.png"
+                )
+
+            else:
+                # ── Vertical / 9:16 video: full screen, safe zone overlay ──
+                top_caption_path = generate_creator_caption_banner(
+                    title,
+                    max_width=980,
+                    min_width=650,
+                    is_bottom=False,
+                    is_vertical=True,
+                    filename="top_caption.png"
+                )
+
+            # Assign sequential input indices for FFmpeg
+            current_idx = 1
+            if top_caption_path and top_caption_path.exists():
+                top_input_idx = current_idx
+                inputs.extend(["-loop", "1", "-i", str(top_caption_path)])
+                current_idx += 1
+
+            if bottom_caption_path and bottom_caption_path.exists():
+                bottom_input_idx = current_idx
+                inputs.extend(["-loop", "1", "-i", str(bottom_caption_path)])
+                current_idx += 1
+
+        except Exception as e:
+            logger.warning(f"Could not generate creator caption banners: {e}")
     
     # 3. Build filter chains
     filter_chains = []
     
     # A. Scale/Crop base canvas (1080x1920)
-    # If the video is landscape/square, use blurred background + centered foreground.
-    # If it is portrait, scale to fit.
-    # A. Scale/Crop base canvas (1080x1920)
-    # If the video is landscape/square, use blurred background + centered foreground.
-    # If it is portrait, scale to fit the full screen.
+    # If the video is portrait (already ~9:16), fit and pad to 1080x1920 with black.
+    # If the video is landscape/square, display at full 1080 width centered with blurred background (or clean black padding).
     if meme_ar < 0.6:
-        # Portrait (vertical) meme: scale to fit and pad to exactly 1080x1920
+        # Portrait (vertical) video: scale to fit and pad to exactly 1080x1920
         filter_chains.append(
             f"[0:v]scale=1080:1920:force_original_aspect_ratio=decrease,"
             f"pad=1080:1920:(1080-iw)/2:(1920-ih)/2:color=black[base_v]"
         )
     else:
-        # Landscape/Square meme: split into blurred bg and scaled fg
-        filter_chains.append(
-            f"[0:v]split=2[bg_src][fg_src]"
-        )
-        # Background: blur and scale to 1080x1920
-        filter_chains.append(
-            f"[bg_src]scale=1080:1920:force_original_aspect_ratio=increase,"
-            f"crop=1080:1920,boxblur=30:5[bg_blurred]"
-        )
-        # Foreground: scale to width 1032 (preserving aspect ratio)
-        fg_w = 1032
-        fg_h = make_even(1032 / meme_ar)
-        filter_chains.append(
-            f"[fg_src]scale={fg_w}:{fg_h}:force_original_aspect_ratio=decrease[fg_scaled]"
-        )
-        # Overlay foreground onto blurred background
-        filter_chains.append(
-            f"[bg_blurred][fg_scaled]overlay=x=(W-w)/2:y=(H-h)/2[base_v]"
-        )
+        # Landscape/Square video:
+        if getattr(config, "OVERLAY_BACKGROUND_BLUR", True):
+            filter_chains.append(
+                f"[0:v]split=2[bg_src][fg_src]"
+            )
+            # Background: blur and scale to fill 1080x1920
+            filter_chains.append(
+                f"[bg_src]scale=1080:1920:force_original_aspect_ratio=increase,"
+                f"crop=1080:1920,boxblur=30:5[bg_blurred]"
+            )
+            # Foreground: scale to full 1080 width (preserving original aspect ratio completely)
+            fg_w = 1080
+            fg_h = make_even(1080 / meme_ar)
+            filter_chains.append(
+                f"[fg_src]scale={fg_w}:{fg_h}:force_original_aspect_ratio=decrease[fg_scaled]"
+            )
+            # Overlay foreground onto blurred background
+            filter_chains.append(
+                f"[bg_blurred][fg_scaled]overlay=x=(W-w)/2:y=(H-h)/2[base_v]"
+            )
+        else:
+            # Clean black letterboxing (no blur, pure original video)
+            filter_chains.append(
+                f"[0:v]scale=1080:1920:force_original_aspect_ratio=decrease,"
+                f"pad=1080:1920:(1080-iw)/2:(1920-ih)/2:color=black[base_v]"
+            )
         
     last_v_tag = "base_v"
+
+    # B. Overlay Top Caption Banner
+    if top_caption_path and top_input_idx is not None:
+        from PIL import Image
+        try:
+            _, th = Image.open(top_caption_path).size
+        except Exception:
+            th = 130
+
+        if meme_ar >= 1.2:
+            fg_h = make_even(1080 / meme_ar)
+            fg_top = (1920 - fg_h) // 2
+            if bottom_caption_path and bottom_input_idx is not None:
+                # When both top and bottom banners exist, position symmetrically around the video
+                top_y = max(120, fg_top - th - 65)
+            else:
+                # Single punchy caption on top: center in the top space
+                top_y = max(120, (fg_top - th) // 2)
+        elif meme_ar >= 0.6:
+            fg_h = make_even(1080 / meme_ar)
+            fg_top = (1920 - fg_h) // 2
+            top_y = max(120, fg_top - th - 50)
+        else:
+            top_y = 150
+
+        filter_chains.append(
+            f"[{last_v_tag}][{top_input_idx}:v]overlay=x=(W-w)/2:y={top_y}[v_top_caption]"
+        )
+        last_v_tag = "v_top_caption"
+
+    # C. Overlay Bottom Caption Banner (for landscape videos)
+    if bottom_caption_path and bottom_input_idx is not None:
+        from PIL import Image
+        try:
+            _, bh = Image.open(bottom_caption_path).size
+        except Exception:
+            bh = 110
+
+        fg_h = make_even(1080 / meme_ar)
+        fg_top = (1920 - fg_h) // 2
+        fg_bottom = fg_top + fg_h
+        # Position bottom banner right below the video, leaving ample clearance above YouTube Shorts UI and player controls
+        bottom_y = min(1440, fg_bottom + 65)
+
+        filter_chains.append(
+            f"[{last_v_tag}][{bottom_input_idx}:v]overlay=x=(W-w)/2:y={bottom_y}[v_bot_caption]"
+        )
+        last_v_tag = "v_bot_caption"
         
-    # C. Add Branding Overlay
+    # D. Add Branding Overlay
     if branding_text:
         # Subtle channel branding/watermark at the bottom
         filter_chains.append(
