@@ -72,7 +72,7 @@ for s, w in _preferred_weights.items():
     if s in SUBREDDIT_WEIGHTS:
         SUBREDDIT_WEIGHTS[s] = float(_env(f"SUBREDDIT_WEIGHT_{s.upper()}", str(w)))
 
-REDDIT_SORT = _env("REDDIT_SORT", "top")  # top, hot, rising, new
+REDDIT_SORT = _env("REDDIT_SORT", "best")  # best, top, hot, rising, new
 REDDIT_TIME_FILTER = _env("REDDIT_TIME_FILTER", "week")  # day, week, month, year, all
 REDDIT_MIN_SCORE = int(_env("REDDIT_MIN_SCORE", "100"))
 REDDIT_MIN_COMMENTS = int(_env("REDDIT_MIN_COMMENTS", "10"))

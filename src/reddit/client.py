@@ -151,9 +151,10 @@ def save_processed_id(post_id: str, subreddit: Optional[str] = None) -> None:
 
 def _fetch_anonymous_json(subreddit: str, sort: str, time_filter: str) -> List[dict]:
     """Fetch subreddit posts using the public JSON API."""
-    url = f"https://old.reddit.com/r/{subreddit}/{sort}.json"
+    effective_sort = "hot" if sort == "best" else sort
+    url = f"https://old.reddit.com/r/{subreddit}/{effective_sort}.json"
     params = {}
-    if sort == "top" and time_filter:
+    if effective_sort == "top" and time_filter:
         params["t"] = time_filter
     
     logger.info(f"Fetching posts from anonymous Reddit feed: {url}")
@@ -224,6 +225,9 @@ def _fetch_with_praw(subreddit: str, sort: str, time_filter: str) -> List[dict]:
             feed = sub.new(limit=50)
         elif sort == "rising":
             feed = sub.rising(limit=50)
+        elif sort == "best":
+            # In PRAW, subreddits use .hot() as the algorithmic 'best'
+            feed = sub.hot(limit=50)
         else:
             feed = sub.hot(limit=50)
 
@@ -261,7 +265,7 @@ def _fetch_with_praw(subreddit: str, sort: str, time_filter: str) -> List[dict]:
         return []
 
 
-def _fetch_with_rss(subreddit: str) -> List[dict]:
+def _fetch_with_rss(subreddit: str, sort: str = "best") -> List[dict]:
     """Fetch posts via public RSS feeds using public RSS-to-JSON API proxies as a fallback."""
     import html.parser
     import re as _re
@@ -288,7 +292,15 @@ def _fetch_with_rss(subreddit: str) -> List[dict]:
         def get_text(self):
             return "".join(self.text)
 
-    rss_url = f"https://www.reddit.com/r/{subreddit}/.rss"
+    if sort == "new":
+        rss_url = f"https://www.reddit.com/r/{subreddit}/new/.rss"
+    elif sort == "top":
+        rss_url = f"https://www.reddit.com/r/{subreddit}/top/.rss"
+    elif sort == "rising":
+        rss_url = f"https://www.reddit.com/r/{subreddit}/rising/.rss"
+    else:
+        # Default 'best' / 'hot' algorithmic feed
+        rss_url = f"https://www.reddit.com/r/{subreddit}/.rss"
     encoded_url = urllib.parse.quote_plus(rss_url)
     
     proxies = [
@@ -452,7 +464,7 @@ def _fetch_with_rss(subreddit: str) -> List[dict]:
     return []
 
 
-def _fetch_with_redlib(subreddit: str) -> List[dict]:
+def _fetch_with_redlib(subreddit: str, sort: str = "best") -> List[dict]:
     """Fetch posts using public Redlib proxy instances without API keys."""
     instances = _get_redlib_instances(exclude_anubis=False)
     # Prioritize safereddit.com as it is historically the most stable for scraping listings
@@ -460,7 +472,10 @@ def _fetch_with_redlib(subreddit: str) -> List[dict]:
     
     # Try up to 8 instances
     for instance in instances[:8]:
-        url = f"{instance}/r/{subreddit}"
+        if sort and sort in ["best", "hot", "new", "top", "rising"]:
+            url = f"{instance}/r/{subreddit}?sort={sort}"
+        else:
+            url = f"{instance}/r/{subreddit}"
         logger.info(f"Fetching posts from Redlib instance: {url}")
         try:
             headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"}

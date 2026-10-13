@@ -546,14 +546,14 @@ class RedditAnonymousProvider(BaseProvider):
             if len(raw_posts) >= 15:
                 break
                 
-            logger.info(f"Fetching posts via Anonymous Fallbacks for r/{sub}")
-            sub_raw = _fetch_with_redlib(sub)
+            logger.info(f"Fetching posts via Anonymous Fallbacks for r/{sub} (sort: {config.REDDIT_SORT})")
+            sub_raw = _fetch_with_redlib(sub, sort=config.REDDIT_SORT)
             
             if not sub_raw:
                 sub_raw = _fetch_anonymous_json(sub, config.REDDIT_SORT, config.REDDIT_TIME_FILTER)
                 
             if not sub_raw:
-                sub_raw = _fetch_with_rss(sub)
+                sub_raw = _fetch_with_rss(sub, sort=config.REDDIT_SORT)
                 
             if sub_raw:
                 logger.info(f"🎉 Successfully fetched {len(sub_raw)} posts for r/{sub} via Anonymous Fallbacks")
