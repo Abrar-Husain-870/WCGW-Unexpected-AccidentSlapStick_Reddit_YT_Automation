@@ -1,4 +1,5 @@
 import datetime
+import os
 from typing import List, Optional
 
 import config
@@ -81,8 +82,13 @@ def check_scheduler_run(force: bool = False) -> bool:
     Returns:
         True if the pipeline should run and upload, False otherwise.
     """
-    if force:
-        logger.info("Scheduler Check: Forced run requested (bypassing schedule slots & daily limit)")
+    is_github = os.environ.get("GITHUB_ACTIONS") == "true"
+    is_local = not is_github
+    is_manual_dispatch = os.environ.get("GITHUB_EVENT_NAME") == "workflow_dispatch"
+    allow_bypass = force or is_local or is_manual_dispatch
+
+    if allow_bypass:
+        logger.info("Scheduler Check: Manual/Local/Forced run detected (bypassing schedule slots & daily limit)")
         return True
 
     if not can_upload_now():

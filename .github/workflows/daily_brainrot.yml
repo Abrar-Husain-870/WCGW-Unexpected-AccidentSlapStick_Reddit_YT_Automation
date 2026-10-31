@@ -143,7 +143,12 @@ jobs:
           STYLE="${{ github.event.inputs.style || 'random' }}"
           SUB="${{ github.event.inputs.subreddit }}"
 
-          CMD="python run_pipeline.py --force --style $STYLE"
+          # Use --force only on manual runs (workflow_dispatch); scheduled runs obey daily limit & slots
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            CMD="python run_pipeline.py --force --style $STYLE"
+          else
+            CMD="python run_pipeline.py --style $STYLE"
+          fi
 
           # Append optional subreddit override from manual dispatch
           if [ -n "$SUB" ]; then

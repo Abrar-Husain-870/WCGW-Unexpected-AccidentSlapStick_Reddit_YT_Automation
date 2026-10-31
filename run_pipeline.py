@@ -464,7 +464,8 @@ def main() -> None:
                     description=optimized_meta["description"],
                     tags=optimized_meta["tags"],
                     category_id=optimized_meta["category_id"],
-                    privacy=args.privacy
+                    privacy=args.privacy,
+                    force=args.force
                 )
 
                 if video_id:

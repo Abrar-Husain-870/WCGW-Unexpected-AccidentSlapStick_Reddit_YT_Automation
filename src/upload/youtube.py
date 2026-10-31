@@ -1,5 +1,6 @@
 import datetime
 import json
+import os
 import random
 import time
 from pathlib import Path
@@ -137,7 +138,8 @@ def upload_short(
     tags: List[str] = None,
     category_id: str = "22",
     privacy: str = "public",
-    retries: int = 3
+    retries: int = 3,
+    force: bool = False
 ) -> str:
     """
     Upload video to YouTube Shorts with automatic chunked retries and rate limiting.
@@ -151,8 +153,15 @@ def upload_short(
     if not video_path.exists():
         logger.error(f"Upload failed: Video not found at {video_path}")
         return ""
-        
-    if not can_upload_now():
+
+    is_github = os.environ.get("GITHUB_ACTIONS") == "true"
+    is_local = not is_github
+    is_manual_dispatch = os.environ.get("GITHUB_EVENT_NAME") == "workflow_dispatch"
+    allow_bypass = force or is_local or is_manual_dispatch
+
+    if allow_bypass:
+        logger.info("Upload check: Manual/Local/Forced run detected — daily upload limit relaxed.")
+    elif not can_upload_now():
         logger.error(f"Upload aborted: Daily upload limit reached ({config.MAX_VIDEOS_PER_DAY}/day)")
         return ""
 
