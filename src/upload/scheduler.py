@@ -76,18 +76,18 @@ def check_scheduler_run(force: bool = False) -> bool:
     Determine if the pipeline should run right now.
     
     Args:
-        force: If True, ignore schedule slots and only check the 24h upload limit.
+        force: If True, bypass schedule slots and daily upload limits.
         
     Returns:
         True if the pipeline should run and upload, False otherwise.
     """
-    if not can_upload_now():
-        logger.info("Scheduler Check: Blocked (daily limit of 4 uploads reached)")
-        return False
-        
     if force:
-        logger.info("Scheduler Check: Forced run requested")
+        logger.info("Scheduler Check: Forced run requested (bypassing schedule slots & daily limit)")
         return True
+
+    if not can_upload_now():
+        logger.info(f"Scheduler Check: Blocked (daily limit of {config.MAX_VIDEOS_PER_DAY} uploads reached)")
+        return False
         
     schedule_times = config.UPLOAD_SCHEDULE_TIMES
     if not schedule_times:
